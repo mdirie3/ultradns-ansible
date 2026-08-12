@@ -9,12 +9,23 @@
 
   tasks:
 
+    - name: Check if log file exists
+      ansible.builtin.stat:
+        path: "{{ log_path }}"
+      register: log_file
+
+    - name: Report if log file is missing
+      ansible.builtin.debug:
+        msg: "Log file not found: {{ log_path }}"
+      when: not log_file.stat.exists
+
     - name: Get the last 20 timing log lines
       ansible.builtin.shell:
         cmd: "grep -E '{{ regex_pattern }}' {{ log_path }} | tail -20"
       register: raw_lines
       changed_when: false
       failed_when: raw_lines.rc not in [0, 1]
+      when: log_file.stat.exists
 
     - name: Extract the timing values
       ansible.builtin.set_fact:
@@ -25,6 +36,7 @@
             | map('int')
             | list
           }}
+      when: log_file.stat.exists
 
     - name: Calculate the mean
       ansible.builtin.set_fact:

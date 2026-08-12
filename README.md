@@ -7,7 +7,6 @@ This project uses Ansible to automate the analysis of UltraDNS quiz application 
 The playbook retrieves the latest 20 matching log entries and calculates application response-time statistics for each server.
 
 The playbook:
-
 - Checks whether the application log exists
 - Retrieves the latest 20 matching timing log entries
 - Extracts application response times in milliseconds
@@ -140,16 +139,22 @@ Std Dev: 2.0 ms
 The playbook completed successfully with:
 
 ```text
-ok=6
+ok=7
 changed=0
 unreachable=0
 failed=0
-skipped=1
+skipped=2
 ```
 
 The skipped task is expected when timing entries are found because the playbook only reports "no matching entries found" when zero timing entries are available.
 
 ## Design Decisions
+
+### `ansible.builtin.stat`
+
+The `stat` module checks whether the expected log file exists before attempting to process it.
+
+This allows the playbook to handle a missing log file separately from a log file that exists but contains no matching timing entries.
 
 ### `gather_facts: false`
 
@@ -158,6 +163,8 @@ System facts are not required for this log-analysis task, so fact gathering is d
 ### `ansible.builtin.shell`
 
 The shell module is used to search the log with `grep` and retrieve the latest 20 matching entries with `tail`.
+
+The command is read-only and does not modify the target server. The task is also marked with `changed_when: false` because the playbook is only reading log data.
 
 The operation is read-only and does not modify the target server.
 
