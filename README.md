@@ -8,6 +8,7 @@ The playbook retrieves the latest 20 matching log entries and calculates applica
 
 The playbook:
 
+- Checks whether the application log exists
 - Retrieves the latest 20 matching timing log entries
 - Extracts application response times in milliseconds
 - Calculates the mean response time
