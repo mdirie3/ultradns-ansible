@@ -1,0 +1,62 @@
+---
+- name: Analyze the quiz application timing logs
+  hosts: quiz_servers
+  gather_facts: false
+
+  vars:
+    log_path: /var/log/ultradns-quiz-madeup.log
+    regex_pattern: "Ultradns quiz application took [0-9]+ ms"
+
+  tasks:
+
+    - name: Get the last 20 timing log lines
+      ansible.builtin.shell:
+        cmd: "grep -E '{{ regex_pattern }}' {{ log_path }} | tail -20"
+      register: raw_lines
+      changed_when: false
+      failed_when: raw_lines.rc not in [0, 1]
+
+    - name: Extract the timing values
+      ansible.builtin.set_fact:
+        timings: >-
+          {{
+            raw_lines.stdout_lines
+            | map('regex_replace', '.*took ([0-9]+) ms', '\1')
+            | map('int')
+            | list
+          }}
+
+    - name: Calculate the mean
+      ansible.builtin.set_fact:
+        mean_value: "{{ (timings | sum) / (timings | length) }}"
+      when: timings | length > 0
+
+    - name: Calculate the sum of squared differences from mean
+      ansible.builtin.set_fact:
+        sum_of_squares: >-
+          {{
+            sum_of_squares | default(0) +
+            ((item - mean_value) ** 2)
+          }}
+      loop: "{{ timings }}"
+      when: timings | length > 0
+
+    - name: Calculate the standard deviation
+      ansible.builtin.set_fact:
+        stddev_value: "{{ (sum_of_squares / (timings | length)) ** 0.5 }}"
+      when: timings | length > 0
+
+    - name: Display the analysis results
+      ansible.builtin.debug:
+        msg:
+          - "Server: {{ inventory_hostname }}"
+          - "Timings (ms): {{ timings }}"
+          - "Samples: {{ timings | length }}"
+          - "Mean: {{ mean_value | round(2) }} ms"
+          - "Std Dev: {{ stddev_value | round(2) }} ms"
+      when: timings | length > 0
+
+    - name: Report when no matching entries were found
+      ansible.builtin.debug:
+        msg: "No matching timing entries found on {{ inventory_hostname }}"
+      when: timings | length == 0
